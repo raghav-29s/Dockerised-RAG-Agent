@@ -1,4 +1,4 @@
-# Opkey RAG Agent
+# Dockerised RAG Agent
 
 ## Overview
 
