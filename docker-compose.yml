@@ -1,0 +1,60 @@
+services:
+  rag-api:
+
+    build: .
+
+    container_name: opkey-rag-agent
+
+    # Host port comes from PORT in .env; the app listens on 8000 inside the container
+    ports:
+      - "${PORT:-8000}:8000"
+
+    env_file:
+      - .env
+
+    volumes:
+      - chroma_data:/app/chroma_db
+      - ./data:/app/data
+
+    depends_on:
+      ollama-pull:
+        condition: service_completed_successfully
+
+  # Free local LLM server with an OpenAI-compatible API at http://ollama:11434/v1
+  ollama:
+
+    image: ollama/ollama:0.34.0
+
+    container_name: opkey-ollama
+
+    environment:
+      # The default context window is too small for 5 retrieved chunks and gets silently truncated
+      - OLLAMA_CONTEXT_LENGTH=8192
+      - OLLAMA_KEEP_ALIVE=30m
+
+    volumes:
+      - ollama_models:/root/.ollama
+
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # One-shot job: downloads the model into the ollama volume on first start (no-op afterwards)
+  ollama-pull:
+
+    image: ollama/ollama:0.34.0
+
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+
+    entrypoint: ["ollama", "pull", "${OLLAMA_MODEL:-qwen2.5:3b}"]
+
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+volumes:
+  chroma_data:
+  ollama_models:
